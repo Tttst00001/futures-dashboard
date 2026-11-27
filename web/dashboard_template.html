@@ -186,6 +186,7 @@ function renderDetail(){
 }
 
 const CHART = {up:"#d94a45", down:"#15966f", grid:"#eef1f5", text:"#778196", K:"#3d6fe8", D:"#e49b2f", J:"#8b5cf6", RSI:"#7f8fa6"};
+const KDJ_BAND = {up: "rgba(217,74,69,.13)", down: "rgba(21,150,111,.13)"};
 const drawerCharts = [];
 
 function candleOption(bars){
@@ -233,6 +234,19 @@ function candleOption(bars){
     ],
     dataZoom: [{type: "inside", xAxisIndex: [0, 1, 2, 3], start: 0, end: 100, zoomOnMouseWheel: true, moveOnMouseMove: false}],
     series: [
+      {name: "KDJ底色", type: "custom", xAxisIndex: 0, yAxisIndex: 0, z: 1, silent: true,
+       data: bars.map((b, i) => [i]),
+       renderItem(params, api){
+         const box = params.coordSys;
+         if(!box || !box.width) return null;
+         const b = bars[params.dataIndex];
+         if(!b) return null;
+         const step = api.size([1, 0])[0];
+         const center = api.coord([params.dataIndex, 0])[0];
+         return {type: "rect",
+           shape: {x: center - step / 2, y: box.y, width: step + 0.5, height: box.height},
+           style: {fill: b[6] > b[7] ? KDJ_BAND.up : KDJ_BAND.down}};
+       }},
       {name: "K线", type: "candlestick", xAxisIndex: 0, yAxisIndex: 0, data: ohlc,
        itemStyle: {color: CHART.up, color0: CHART.down, borderColor: CHART.up, borderColor0: CHART.down}},
       {name: "成交量", type: "bar", xAxisIndex: 1, yAxisIndex: 1, data: vols, barMaxWidth: 11},
