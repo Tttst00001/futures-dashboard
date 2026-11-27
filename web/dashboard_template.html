@@ -273,7 +273,6 @@ function candleOption(bars, marker){
       {name: "成交量", type: "bar", xAxisIndex: 1, yAxisIndex: 1, data: vols, barMaxWidth: 11},
       {name: "K", type: "line", xAxisIndex: 2, yAxisIndex: 2, data: line(6), showSymbol: false, lineStyle: {width: 1.4, color: CHART.K}},
       {name: "D", type: "line", xAxisIndex: 2, yAxisIndex: 2, data: line(7), showSymbol: false, lineStyle: {width: 1.4, color: CHART.D}},
-      {name: "J", type: "line", xAxisIndex: 2, yAxisIndex: 2, data: line(8), showSymbol: false, lineStyle: {width: 1.4, color: CHART.J}},
       {name: "KDJ参考", type: "line", xAxisIndex: 2, yAxisIndex: 2, data: [], markLine: ref([20, 50, 80])},
       {name: "RSI", type: "line", xAxisIndex: 3, yAxisIndex: 3, data: line(9), showSymbol: false, lineStyle: {width: 1.6, color: CHART.RSI},
        markArea: {silent: true, itemStyle: {color: "rgba(61,111,232,.05)"}, data: [[{yAxis: 20}, {yAxis: 80}]]},
@@ -294,7 +293,7 @@ function drawCandles(el, bars, marker){
 function chartMeta(bars){
   if(!bars || !bars.length) return "数据不足";
   const b = bars[bars.length - 1];
-  return `收 ${fmt(b[4], b[4] > 1000 ? 0 : 2)} · K ${num(b[6])} D ${num(b[7])} J ${num(b[8])} · RSI ${b[9] == null ? "—" : num(b[9])}`;
+  return `收 ${fmt(b[4], b[4] > 1000 ? 0 : 2)} · K ${num(b[6])} D ${num(b[7])} · RSI ${b[9] == null ? "—" : num(b[9])}`;
 }
 
 function disposeCharts(){while(drawerCharts.length)drawerCharts.pop().dispose();}
@@ -305,7 +304,7 @@ function renderDrawer(){
   disposeCharts();
   const s = x.signal || {};
   $("drawerTitle").textContent = x.name;
-  $("drawerSub").textContent = `${s.contract || x.symbol} · ${x.family} · 距今 ${s.cross_days == null ? "—" : s.cross_days + "天"} · 价差 ${s.spread == null ? "—" : (s.spread > 0 ? "+" : "") + num(s.spread)} · 量仓比 ${s.volume_oi_ratio == null ? "—" : fmt(s.volume_oi_ratio, 2)} · 每张卡片依次为蜡烛、成交量、KDJ 三线（K 蓝 / D 橙 / J 紫）、RSI`;
+  $("drawerSub").textContent = `${s.contract || x.symbol} · ${x.family} · 距今 ${s.cross_days == null ? "—" : s.cross_days + "天"} · 价差 ${s.spread == null ? "—" : (s.spread > 0 ? "+" : "") + num(s.spread)} · 量仓比 ${s.volume_oi_ratio == null ? "—" : fmt(s.volume_oi_ratio, 2)} · 每张卡片依次为蜡烛、成交量、KDJ（K 蓝 / D 橙）、RSI`;
   const cards = [["30分钟", s.chart_min30, s.dots_min30, null], ["1小时", s.chart_hourly, s.dots_hourly, crossMarker(s.chart_hourly, s.cross_bars_hourly)], ["日线", s.chart_daily, s.dots_daily, crossMarker(s.chart_daily, s.cross_days)]];
   $("drawerBody").innerHTML = cards.map((c, i) => `<section class="kcard"><div class="kcard-head"><span class="kcard-title">${c[0]}</span>${dots(c[2])}<span class="kcard-meta" id="kmeta${i}">—</span></div><div class="kchart" id="kchart${i}"></div></section>`).join("");
   cards.forEach((c, i) => { drawCandles($("kchart" + i), c[1], c[3]); $("kmeta" + i).textContent = chartMeta(c[1]); });
