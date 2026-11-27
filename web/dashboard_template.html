@@ -232,7 +232,6 @@ function candleOption(bars, marker){
           + cell("涨跌", move)
           + cell("成交量", fmt(b[5], 0))
           + cell("K / D", `${num(b[6])} / ${num(b[7])}`)
-          + cell("J", num(b[8]))
           + cell("RSI", b[9] == null ? "—" : num(b[9]))
           + `</div>`;
       }
