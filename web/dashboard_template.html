@@ -55,7 +55,7 @@ body.locked{overflow:hidden}
 
   <section id="heat" class="layout">
     <div class="panel">
-      <div class="table-wrap"><table><thead><tr><th>品种</th><th>代码</th><th>距今</th><th>最新</th><th class="sig-head">30分钟</th><th class="sig-head">1小时</th><th class="sig-head">日</th><th class="sig-head">周</th><th>信号收盘价</th><th>价差</th><th>21日均量</th><th>量仓比</th></tr></thead><tbody id="heatBody"></tbody></table></div>
+      <div class="table-wrap"><table><thead><tr><th>品种</th><th>代码</th><th>距今</th><th>最新</th><th class="sig-head">30分钟</th><th class="sig-head">1小时</th><th class="sig-head">日</th><th class="sig-head">周</th><th>信号收盘价</th><th>价差</th><th>均量</th><th>量仓比</th></tr></thead><tbody id="heatBody"></tbody></table></div>
     </div>
     <aside class="panel">
       <div class="panel-head"><div><div class="panel-title">家族强弱</div><div class="panel-sub">点击家族筛选下方品种</div></div><button id="clearFamily" class="control">全部</button></div>
@@ -179,7 +179,7 @@ function renderDetail(){
   const series=state.timeframe==="daily"?x.daily_series:x.hourly_series;
   drawChart($("detailChart"),[{name:x.name,color:"#3d6fe8",points:series}],{area:true,decimals:x.close>1000?0:2,lineWidth:2.2});
   $("detailNote").textContent=state.timeframe==="daily"?`连续合约 ${x.symbol} 日线走势，截至 ${x.latest_daily}；下方指标按主力合约 ${s.contract||x.symbol} 计算`:`连续合约 ${x.symbol} 60分钟走势，截至 ${x.latest_hourly||"缺失"}`;
-  const metrics=[["主力合约",s.contract||"—","flat"],["日线 K / D",s.kdj?`${fmt(s.kdj.K,1)} / ${fmt(s.kdj.D,1)}`:"—",s.direction?"up":"down"],["日线交叉",s.cross_days==null?"—":`${s.cross_days} 根前`,"flat"],["小时交叉",s.cross_bars_hourly==null?"—":`${s.cross_bars_hourly} 根前`,"flat"],["RSI(H)",fmt(s.rsi_hourly,1),"flat"],["信号收盘价",num(s.signal_close),"flat"],["最新小时价",num(s.latest_hourly),"flat"],["价差",s.spread==null?"—":(s.spread>0?"+":"")+num(s.spread),cls(s.spread)],["交叉后涨幅",s.gain_after_cross==null?"—":pct(s.gain_after_cross),cls(s.gain_after_cross)],["EMA55(主力)",num(s.ema55),"flat"],["日线5根",dots(s.dots_daily),"flat"],["周线5根",s.bars_weekly>=25?dots(s.dots_weekly):`不足25周(${s.bars_weekly||0})`,"flat"]].concat([["12-1动量",pct(x.factors.mom12_1),cls(x.factors.mom12_1)],["63日动量",pct(x.factors.mom63),cls(x.factors.mom63)],["21日动量",pct(x.factors.mom21),cls(x.factors.mom21)],["ADX",fmt(x.factors.adx,1),"flat"],["+DI/-DI",`${fmt(x.factors.plus_di,1)}/${fmt(x.factors.minus_di,1)}`,cls(x.factors.direction_score)],["Donchian",fmt(x.factors.donchian55,0),"flat"],["量仓确认",fmt(x.factors.oi_confirm,2),cls(x.factors.oi_confirm)],["OBV20",fmt(x.vp_factors.obv20,1),cls(x.vp_factors.obv20)],["MFI14",fmt(x.vp_factors.mfi14,1),"flat"],["成交额变化",fmt(x.vp_factors.amount_change,2),cls(x.vp_factors.amount_change)],["量价背离",fmt(x.vp_factors.volume_price_divergence,2),cls(x.vp_factors.volume_price_divergence)],["ATR动量",fmt(x.factors.atr_mom21,2),cls(x.factors.atr_mom21)],["5日",pct(x.daily_change[5]),cls(x.daily_change[5])],["持仓5日",pct(x.oi_change_5d),cls(x.oi_change_5d)],["ATR14占比",fmt(x.atr_pct,2)+"%","flat"]]);
+  const metrics=[["主力合约",s.contract||"—","flat"],["日线 K / D",s.kdj?`${fmt(s.kdj.K,1)} / ${fmt(s.kdj.D,1)}`:"—",s.direction?"up":"down"],["日线交叉",s.cross_days==null?"—":`${s.cross_days} 根前`,"flat"],["小时交叉",s.cross_bars_hourly==null?"—":`${s.cross_bars_hourly} 根前`,"flat"],["RSI·小时",fmt(s.rsi_hourly,1),"flat"],["信号收盘价",num(s.signal_close),"flat"],["最新小时价",num(s.latest_hourly),"flat"],["价差",s.spread==null?"—":(s.spread>0?"+":"")+num(s.spread),cls(s.spread)],["交叉后涨幅",s.gain_after_cross==null?"—":pct(s.gain_after_cross),cls(s.gain_after_cross)],["EMA(主力)",num(s.ema55),"flat"],["日线信号",dots(s.dots_daily),"flat"],["周线信号",s.bars_weekly>=25?dots(s.dots_weekly):"样本不足","flat"]].concat([["长周期动量",pct(x.factors.mom12_1),cls(x.factors.mom12_1)],["中期动量",pct(x.factors.mom63),cls(x.factors.mom63)],["短期动量",pct(x.factors.mom21),cls(x.factors.mom21)],["ADX",fmt(x.factors.adx,1),"flat"],["+DI/-DI",`${fmt(x.factors.plus_di,1)}/${fmt(x.factors.minus_di,1)}`,cls(x.factors.direction_score)],["Donchian",fmt(x.factors.donchian55,0),"flat"],["量仓确认",fmt(x.factors.oi_confirm,2),cls(x.factors.oi_confirm)],["OBV",fmt(x.vp_factors.obv20,1),cls(x.vp_factors.obv20)],["MFI",fmt(x.vp_factors.mfi14,1),"flat"],["成交额变化",fmt(x.vp_factors.amount_change,2),cls(x.vp_factors.amount_change)],["量价背离",fmt(x.vp_factors.volume_price_divergence,2),cls(x.vp_factors.volume_price_divergence)],["ATR动量",fmt(x.factors.atr_mom21,2),cls(x.factors.atr_mom21)],["5日涨跌",pct(x.daily_change[5]),cls(x.daily_change[5])],["持仓变化",pct(x.oi_change_5d),cls(x.oi_change_5d)],["ATR占比",fmt(x.atr_pct,2)+"%","flat"]]);
   $("detailMetrics").innerHTML=metrics.map(m=>`<div class="metric"><div class="metric-label">${m[0]}</div><div class="metric-value ${m[2]}">${m[1]}</div></div>`).join("");
   const score=(x.factor_score-50)*2;$("scoreDot").style.left=`${x.factor_score}%`;
   $("detailInsight").innerHTML=`价格趋势排名 <b class="${x.factor_score>=50?"up":"down"}">${fmt(x.factor_score,1)}</b>，量价确认排名 <b class="${x.vp_score>=50?"up":"down"}">${fmt(x.vp_score,1)}</b>。`+`OBV ${fmt(x.vp_factors.obv20,1)}，MFI ${fmt(x.vp_factors.mfi14,1)}，成交额变化 ${fmt(x.vp_factors.amount_change,2)}，量价背离 ${fmt(x.vp_factors.volume_price_divergence,2)}。`+`<br>两项排名差距超过40时，优先检查是价格领先还是量能虚假。`;
@@ -220,7 +220,7 @@ function candleOption(bars){
           + cell("成交量", fmt(b[5], 0))
           + cell("K / D", `${num(b[6])} / ${num(b[7])}`)
           + cell("J", num(b[8]))
-          + cell("RSI(10)", b[9] == null ? "—" : num(b[9]))
+          + cell("RSI", b[9] == null ? "—" : num(b[9]))
           + `</div>`;
       }
     },
@@ -284,7 +284,7 @@ function renderDrawer(){
   disposeCharts();
   const s = x.signal || {};
   $("drawerTitle").textContent = x.name;
-  $("drawerSub").textContent = `${s.contract || x.symbol} · ${x.family} · 距今 ${s.cross_days == null ? "—" : s.cross_days + "天"} · 价差 ${s.spread == null ? "—" : (s.spread > 0 ? "+" : "") + num(s.spread)} · 量仓比 ${s.volume_oi_ratio == null ? "—" : fmt(s.volume_oi_ratio, 2)} · 每张卡片依次为蜡烛、成交量、KDJ(21,21,21) K蓝/D橙/J紫、RSI(10)`;
+  $("drawerSub").textContent = `${s.contract || x.symbol} · ${x.family} · 距今 ${s.cross_days == null ? "—" : s.cross_days + "天"} · 价差 ${s.spread == null ? "—" : (s.spread > 0 ? "+" : "") + num(s.spread)} · 量仓比 ${s.volume_oi_ratio == null ? "—" : fmt(s.volume_oi_ratio, 2)} · 每张卡片依次为蜡烛、成交量、KDJ 三线（K 蓝 / D 橙 / J 紫）、RSI`;
   const cards = [["30分钟", s.chart_min30, s.dots_min30], ["1小时", s.chart_hourly, s.dots_hourly], ["日线", s.chart_daily, s.dots_daily]];
   $("drawerBody").innerHTML = cards.map((c, i) => `<section class="kcard"><div class="kcard-head"><span class="kcard-title">${c[0]}</span>${dots(c[2])}<span class="kcard-meta" id="kmeta${i}">—</span></div><div class="kchart" id="kchart${i}"></div></section>`).join("");
   cards.forEach((c, i) => { drawCandles($("kchart" + i), c[1]); $("kmeta" + i).textContent = chartMeta(c[1]); });
