@@ -187,9 +187,22 @@ function renderDetail(){
 
 const CHART = {up:"#d94a45", down:"#15966f", grid:"#eef1f5", text:"#778196", K:"#3d6fe8", D:"#e49b2f", J:"#8b5cf6", RSI:"#7f8fa6"};
 const KDJ_BAND = {up: "rgba(217,74,69,.13)", down: "rgba(21,150,111,.13)"};
+const CROSS_MARK = {up: "#b03028", down: "#0f6b54", dot: "#e08b1c"};
+
+// 找出信号转换（K/D 关系翻转）的第一根 bar；ago 为“距今几根”
+function crossMarker(bars, ago){
+  if(!bars || bars.length < 2) return null;
+  const isUp = i => bars[i][6] > bars[i][7];
+  const at = i => (i >= 1 && i < bars.length && isUp(i) !== isUp(i - 1)) ? {index: i, close: bars[i][4], high: bars[i][2], up: isUp(i)} : null;
+  const guess = ago == null ? bars.length - 1 : bars.length - 1 - ago;
+  const hit = at(guess);
+  if(hit) return hit;
+  for(let k = Math.min(bars.length - 1, Math.max(1, guess)); k >= 1; k--){ const m = at(k); if(m) return m; }
+  return null;
+}
 const drawerCharts = [];
 
-function candleOption(bars){
+function candleOption(bars, marker){
   const times = bars.map(b => b[0]);
   const ohlc = bars.map(b => [b[1], b[4], b[3], b[2]]);
   const vols = bars.map(b => ({value: b[5], itemStyle: {color: b[4] >= b[1] ? CHART.up : CHART.down, opacity: 0.55}}));
@@ -248,7 +261,15 @@ function candleOption(bars){
            style: {fill: b[6] > b[7] ? KDJ_BAND.up : KDJ_BAND.down}};
        }},
       {name: "K线", type: "candlestick", xAxisIndex: 0, yAxisIndex: 0, data: ohlc,
-       itemStyle: {color: CHART.up, color0: CHART.down, borderColor: CHART.up, borderColor0: CHART.down}},
+       itemStyle: {color: CHART.up, color0: CHART.down, borderColor: CHART.up, borderColor0: CHART.down},
+       ...(marker ? {
+         markLine: {silent: true, symbol: "none", label: {show: false},
+           lineStyle: {color: marker.up ? CROSS_MARK.up : CROSS_MARK.down, width: 1.3, type: "solid", opacity: .95},
+           data: [{yAxis: marker.close}]},
+         markPoint: {silent: true, symbol: "circle", symbolSize: 9, label: {show: false},
+           itemStyle: {color: CROSS_MARK.dot, borderColor: "#fff", borderWidth: 1},
+           data: [{coord: [marker.index, marker.high], symbolOffset: [0, -11], value: marker.close}]}
+       } : {})},
       {name: "成交量", type: "bar", xAxisIndex: 1, yAxisIndex: 1, data: vols, barMaxWidth: 11},
       {name: "K", type: "line", xAxisIndex: 2, yAxisIndex: 2, data: line(6), showSymbol: false, lineStyle: {width: 1.4, color: CHART.K}},
       {name: "D", type: "line", xAxisIndex: 2, yAxisIndex: 2, data: line(7), showSymbol: false, lineStyle: {width: 1.4, color: CHART.D}},
@@ -261,12 +282,12 @@ function candleOption(bars){
   };
 }
 
-function drawCandles(el, bars){
+function drawCandles(el, bars, marker){
   el.innerHTML = "";
   if(!window.echarts){ el.innerHTML = '<div class="empty">图表库 vendor/echarts.min.js 未加载</div>'; return; }
   if(!bars || bars.length < 2){ el.innerHTML = '<div class="empty">数据不足：该周期成熟 bar 少于 2 根</div>'; return; }
   const chart = window.echarts.init(el, null, {renderer: "canvas"});
-  chart.setOption(candleOption(bars));
+  chart.setOption(candleOption(bars, marker));
   drawerCharts.push(chart);
 }
 
@@ -285,9 +306,9 @@ function renderDrawer(){
   const s = x.signal || {};
   $("drawerTitle").textContent = x.name;
   $("drawerSub").textContent = `${s.contract || x.symbol} · ${x.family} · 距今 ${s.cross_days == null ? "—" : s.cross_days + "天"} · 价差 ${s.spread == null ? "—" : (s.spread > 0 ? "+" : "") + num(s.spread)} · 量仓比 ${s.volume_oi_ratio == null ? "—" : fmt(s.volume_oi_ratio, 2)} · 每张卡片依次为蜡烛、成交量、KDJ 三线（K 蓝 / D 橙 / J 紫）、RSI`;
-  const cards = [["30分钟", s.chart_min30, s.dots_min30], ["1小时", s.chart_hourly, s.dots_hourly], ["日线", s.chart_daily, s.dots_daily]];
+  const cards = [["30分钟", s.chart_min30, s.dots_min30, null], ["1小时", s.chart_hourly, s.dots_hourly, crossMarker(s.chart_hourly, s.cross_bars_hourly)], ["日线", s.chart_daily, s.dots_daily, crossMarker(s.chart_daily, s.cross_days)]];
   $("drawerBody").innerHTML = cards.map((c, i) => `<section class="kcard"><div class="kcard-head"><span class="kcard-title">${c[0]}</span>${dots(c[2])}<span class="kcard-meta" id="kmeta${i}">—</span></div><div class="kchart" id="kchart${i}"></div></section>`).join("");
-  cards.forEach((c, i) => { drawCandles($("kchart" + i), c[1]); $("kmeta" + i).textContent = chartMeta(c[1]); });
+  cards.forEach((c, i) => { drawCandles($("kchart" + i), c[1], c[3]); $("kmeta" + i).textContent = chartMeta(c[1]); });
 }
 
 function openDrawer(code){
