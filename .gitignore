@@ -1,2 +1,6 @@
 *.zip
 _verify*.png
+_verify*.jpg
+build/
+__pycache__/
+*.pyc

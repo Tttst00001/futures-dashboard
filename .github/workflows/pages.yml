@@ -1,9 +1,23 @@
-name: Deploy static site to Pages
+name: 更新期市看板并部署
 
 on:
   push:
     branches: [main]
+  schedule:
+    # 时间均为 UTC；北京时间 = UTC+8，周一至周五
+    - cron: "2 2 * * 1-5"     # 10:00 北京时间 · 30/60 分钟
+    - cron: "17 3 * * 1-5"    # 11:15 北京时间 · 30/60 分钟
+    - cron: "17 6 * * 1-5"    # 14:15 北京时间 · 30/60 分钟
+    - cron: "2 7 * * 1-5"     # 15:00 北京时间 · 30/60 分钟
+    - cron: "2 14 * * 1-5"    # 22:00 北京时间 · 30/60 分钟
+    - cron: "2 15 * * 1-5"    # 23:00 北京时间 · 30/60 分钟
+    - cron: "5 9 * * 1-5"     # 17:00 北京时间 · 日线
   workflow_dispatch:
+    inputs:
+      force:
+        description: 忽略本地缓存，强制重新抓取全部周期
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -12,28 +26,82 @@ permissions:
 
 concurrency:
   group: pages
-  cancel-in-progress: true
+  cancel-in-progress: false
+
+env:
+  TZ: Asia/Shanghai
 
 jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 准备 Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: 统一时区
+        run: |
+          sudo ln -sf /usr/share/zoneinfo/Asia/Shanghai /etc/localtime
+          date
+
+      - name: 还原行情缓存
+        uses: actions/cache@v4
+        with:
+          path: data/market
+          key: market-${{ github.run_id }}
+          restore-keys: |
+            market-
+
+      - name: 缓存缺失时释放种子数据
+        run: |
+          if [ ! -d data/market ]; then
+            tar -xzf seed/data-market.tar.gz
+            # 让种子数据显式过期，冷启动必须真实抓取一次
+            find data/market -type f -exec touch -t 202001010000 {} +
+            echo "已释放种子缓存（已置为过期）"
+          fi
+          ls data/market | head -5
+
+      - name: 安装依赖
+        run: pip install --quiet "numpy>=2.0" "MyTT==2.9.3"
+
+      - name: 抓取行情并生成看板
+        env:
+          FORCE: ${{ inputs.force }}
+        run: |
+          if [ "${FORCE}" = "true" ]; then
+            python scripts/market_dashboard.py --workers 8 --force
+          else
+            python scripts/market_dashboard.py --workers 8
+          fi
+
+      - name: 组装站点产物
+        env:
+          UPDATE_MODE: ${{ github.event_name == 'schedule' && github.event.schedule || 'manual' }}
+        run: |
+          export BUILD_TIME="$(date -Iseconds)"
+          mkdir -p build/vendor
+          cp web/index.html build/index.html
+          cp web/vendor/echarts.min.js build/vendor/echarts.min.js
+          python scripts/write_build_info.py >> "$GITHUB_STEP_SUMMARY"
+          ls -lh build build/vendor
+
+      - name: 上传 Pages 产物
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: build
+
   deploy:
+    needs: build
+    runs-on: ubuntu-latest
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
-    runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Pages
-        uses: actions/configure-pages@v5
-        with:
-          enablement: true
-
-      - name: Upload artifact
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: .
-
-      - name: Deploy to GitHub Pages
+      - name: 部署到 GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
