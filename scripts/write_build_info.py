@@ -39,8 +39,9 @@ info = {
     "schedule": {
         "timezone": "Asia/Shanghai",
         "weekdays": "周一至周五",
-        "intraday": ["10:00", "11:15", "14:15", "15:00", "22:00", "23:00"],
-        "daily": "17:00",
+        "intraday": ["10:05", "11:20", "14:20", "15:05", "22:05", "23:05"],
+        "daily": "17:05",
+        "driver": "ticker.yml 自续调度链（GITHUB_TOKEN 触发 workflow_dispatch）",
     },
 }
 

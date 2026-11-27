@@ -1,0 +1,34 @@
+name: 定时调度链
+
+# GitHub 的 schedule 事件在本仓库实测不生效（0 次触发），改由这条链主动 dispatch 构建。
+# push 一次即可点亮链条，之后它会一直睡到各自的更新时刻并交棒，不依赖任何外部服务。
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  actions: write
+  contents: read
+
+concurrency:
+  group: ticker
+  cancel-in-progress: true
+
+jobs:
+  tick:
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+    steps:
+      - name: 立即触发一次构建（验证调度权限）
+        if: github.event_name == 'push'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run pages.yml --ref main --repo "$GITHUB_REPOSITORY"
+
+      - name: 睡到下一个更新时刻并交棒
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GITHUB_TOKEN: ${{ github.token }}
+        run: python3 scripts/schedule_tick.py
