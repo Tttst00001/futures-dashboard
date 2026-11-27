@@ -34,6 +34,7 @@ body.locked{overflow:hidden}
     </div>
     <div class="hero-meta">
       <div class="generated">数据快照：<span id="generatedAt">__GENERATED_AT__</span></div>
+      <div class="generated" id="autoUpdate">自动更新：工作日 10:00 · 11:15 · 14:15 · 15:00 · 22:00 · 23:00（17:00 更新日线）</div>
       <div class="status-pill" id="statusPill"><span class="dot"></span><span id="statusText">正在检查数据状态</span></div>
     </div>
   </div>
@@ -319,7 +320,28 @@ document.querySelectorAll("[data-timeframe]").forEach(b=>b.onclick=()=>{state.ti
 $("drawerClose").onclick=closeDrawer;$("drawerMask").onclick=closeDrawer;
 document.addEventListener("keydown",e=>{if(e.key==="Escape"&&state.drawer)closeDrawer();});
 let resizeTimer;window.addEventListener("resize",()=>{clearTimeout(resizeTimer);resizeTimer=setTimeout(()=>{renderSteel();renderDetail();drawerCharts.forEach(c=>c.resize());},150);});
-renderOverview();renderFamilies();renderTable();renderSteel();renderDetail();
+function renderSchedule(){
+  const el = $("autoUpdate"); if(!el) return;
+  const times = ["10:00","11:15","14:15","15:00","17:00","22:00","23:00"];
+  const now = new Date(); let next = null;
+  for(let d = 0; d <= 8 && !next; d++){
+    const day = new Date(now.getFullYear(), now.getMonth(), now.getDate() + d);
+    if(day.getDay() === 0 || day.getDay() === 6) continue;
+    for(const t of times){
+      const p = t.split(":").map(Number);
+      const dt = new Date(day.getFullYear(), day.getMonth(), day.getDate(), p[0], p[1], 0, 0);
+      if(dt.getTime() > now.getTime()){ next = `${String(dt.getMonth()+1).padStart(2,"0")}-${String(dt.getDate()).padStart(2,"0")} ${t}`; break; }
+    }
+  }
+  const base = `自动更新：工作日 10:00 · 11:15 · 14:15 · 15:00 · 22:00 · 23:00（17:00 更新日线）${next ? " · 下次 " + next : ""}`;
+  el.textContent = base;
+  fetch("build-info.json", {cache: "no-store"}).then(r => r.ok ? r.json() : null).then(bi => {
+    if(!bi || !bi.event) return;
+    const map = {schedule: "定时任务", push: "手动推送", workflow_dispatch: "手动触发"};
+    el.textContent = base + " · 本次：" + (map[bi.event] || bi.event);
+  }).catch(() => {});
+}
+renderOverview();renderFamilies();renderTable();renderSteel();renderDetail();renderSchedule();
 </script>
 </body>
 </html>

@@ -33,6 +33,15 @@ info = {
     "run_id": os.environ.get("GITHUB_RUN_ID") or "",
     "run_number": os.environ.get("GITHUB_RUN_NUMBER") or "",
     "event": os.environ.get("GITHUB_EVENT_NAME") or "",
+    "trigger": {"schedule": "定时任务", "push": "手动推送", "workflow_dispatch": "手动触发"}.get(
+        os.environ.get("GITHUB_EVENT_NAME") or "", os.environ.get("GITHUB_EVENT_NAME") or ""
+    ),
+    "schedule": {
+        "timezone": "Asia/Shanghai",
+        "weekdays": "周一至周五",
+        "intraday": ["10:00", "11:15", "14:15", "15:00", "22:00", "23:00"],
+        "daily": "17:00",
+    },
 }
 
 out_path.parent.mkdir(parents=True, exist_ok=True)
@@ -43,6 +52,10 @@ lines = [
     "",
     f"- 数据快照：`{info['generated_at']}`",
     f"- 抓取完成：`{info['built_at']}`",
+    f"- 触发方式：{info['trigger']}（event = `{info['event']}`）",
+    f"- 定时计划：{info['schedule']['weekdays']} {info['schedule']['timezone']} "
+    + " / ".join(info['schedule']['intraday'])
+    + f"（{info['schedule']['daily']} 更新日线）",
     f"- 品种覆盖：{info['products']} / {info['selected_total']}",
     f"- 日线最新：`{info['latest_daily']}`；60 分钟最新：`{info['latest_hourly']}`",
     f"- 30 分钟数据覆盖：{info['min30_products']} 个品种",
