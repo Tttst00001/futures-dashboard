@@ -97,7 +97,7 @@ def adx14(rows, period=14):
 FACTOR_NAMES = ["mom21", "mom63", "mom12_1", "atr_mom21", "donchian55", "oi_confirm", "direction_score"]
 
 # 量价分析 SOP：阈值固定，改规则必须同时升级版本号并更新 docs/量价分析SOP.md
-VP_SOP_VERSION = "VP-1.0"
+VP_SOP_VERSION = "VP-1.1"
 VP_VOLUME_WINDOW = 20   # 量比基准：前 20 日均量（不含当日）
 VP_BAND_DRY = 0.8       # <0.8 缩量
 VP_BAND_WARM = 1.2      # 0.8–1.2 常量，1.2–1.8 温和放量
@@ -149,7 +149,7 @@ def vp_analysis(daily):
         state, state_text, action, level = "C", "缩量观望", "不做，等量能恢复", "flat"
     elif ratio is not None and ratio >= VP_BAND_HEAVY and oi_day is not None and oi_day <= -VP_OI_DAY:
         state, state_text, action, level = "B", "换手 / 平仓", "不追，等回踩确认", "warn"
-    elif oi_5d is not None and oi_5d <= -VP_OI_5D and price_5d > 0:
+    elif oi_5d is not None and oi_5d <= -VP_OI_5D and price_5d > 0 and (oi_day is None or oi_day < VP_OI_DAY):
         state, state_text, action, level = "D", "价涨仓减（背离）", "减仓，警惕获利了结", "warn"
     elif ratio is not None and ratio >= VP_BAND_WARM and oi_day is not None and oi_day >= VP_OI_DAY and same_way:
         state, state_text, action, level = "A", "新钱进场", "可按砖图方向进场", "up"
