@@ -96,6 +96,119 @@ def adx14(rows, period=14):
 
 FACTOR_NAMES = ["mom21", "mom63", "mom12_1", "atr_mom21", "donchian55", "oi_confirm", "direction_score"]
 
+# 量价分析 SOP：阈值固定，改规则必须同时升级版本号并更新 docs/量价分析SOP.md
+VP_SOP_VERSION = "VP-1.0"
+VP_VOLUME_WINDOW = 20   # 量比基准：前 20 日均量（不含当日）
+VP_BAND_DRY = 0.8       # <0.8 缩量
+VP_BAND_WARM = 1.2      # 0.8–1.2 常量，1.2–1.8 温和放量
+VP_BAND_HEAVY = 1.8     # >1.8 巨量
+VP_OI_DAY = 1.0         # 当日持仓变化阈值 ±1%
+VP_OI_5D = 3.0          # 5 日持仓变化阈值 ±3%
+VP_RATIO_HOT = 2.0      # 量仓比过热线
+
+
+def volume_grade(ratio):
+    if ratio is None:
+        return "无数据"
+    if ratio < VP_BAND_DRY:
+        return "缩量"
+    if ratio < VP_BAND_WARM:
+        return "常量"
+    if ratio < VP_BAND_HEAVY:
+        return "温和放量"
+    return "巨量"
+
+
+def vp_analysis(daily):
+    """量价分析（SOP VP-1.0）：量比 × 持仓变化 × 价格方向 → 状态与动作。
+
+    状态判定优先级固定：缩量 > 换手平仓 > 价涨仓减 > 趋势启动 > 中性。
+    """
+    if not daily or len(daily) < VP_VOLUME_WINDOW + 2 or not daily[-1].get("volume"):
+        return None
+    last = daily[-1]
+    prev = daily[-2]
+    base = [row["volume"] for row in daily[-VP_VOLUME_WINDOW - 1:-1] if row.get("volume")]
+    if not base:
+        return None
+    avg_volume = mean(base)
+    ratio = last["volume"] / avg_volume if avg_volume else None
+    grade = volume_grade(ratio)
+
+    hold = last.get("hold")
+    hold_prev = prev.get("hold")
+    oi_day = (hold / hold_prev - 1) * 100 if hold and hold_prev else None
+    hold_5 = daily[-6].get("hold") if len(daily) > 6 else None
+    oi_5d = (hold / hold_5 - 1) * 100 if hold and hold_5 else None
+    price_day = (last["close"] / prev["close"] - 1) * 100 if prev["close"] else 0.0
+    price_5d = (last["close"] / daily[-6]["close"] - 1) * 100 if len(daily) > 6 and daily[-6]["close"] else 0.0
+    volume_oi = last["volume"] / hold if hold else None
+    same_way = (price_day > 0) == (price_5d > 0)
+
+    if ratio is not None and ratio < VP_BAND_DRY:
+        state, state_text, action, level = "C", "缩量观望", "不做，等量能恢复", "flat"
+    elif ratio is not None and ratio >= VP_BAND_HEAVY and oi_day is not None and oi_day <= -VP_OI_DAY:
+        state, state_text, action, level = "B", "换手 / 平仓", "不追，等回踩确认", "warn"
+    elif oi_5d is not None and oi_5d <= -VP_OI_5D and price_5d > 0:
+        state, state_text, action, level = "D", "价涨仓减（背离）", "减仓，警惕获利了结", "warn"
+    elif ratio is not None and ratio >= VP_BAND_WARM and oi_day is not None and oi_day >= VP_OI_DAY and same_way:
+        state, state_text, action, level = "A", "新钱进场", "可按砖图方向进场", "up"
+    else:
+        state, state_text, action, level = "E", "中性", "按砖图执行，量能无加分", "flat"
+
+    checks = [
+        {"label": "量能档位",
+         "value": f"{ratio:.2f}" if ratio is not None else "—",
+         "rule": "1.2–1.8 温和放量为准入；<0.8 否决；>1.8 禁追",
+         "pass": ratio is not None and VP_BAND_WARM <= ratio < VP_BAND_HEAVY},
+        {"label": "持仓·当日",
+         "value": f"{oi_day:+.1f}%" if oi_day is not None else "—",
+         "rule": "≥ +1% 增仓（新钱）；≤ −1% 减仓",
+         "pass": oi_day is not None and oi_day >= VP_OI_DAY},
+        {"label": "持仓·5日",
+         "value": f"{oi_5d:+.1f}%" if oi_5d is not None else "—",
+         "rule": "≤ −3% 视为持续减仓（获利了结）",
+         "pass": oi_5d is not None and oi_5d > -VP_OI_5D},
+        {"label": "量仓比",
+         "value": f"{volume_oi:.2f}" if volume_oi is not None else "—",
+         "rule": "< 2.0 换手正常；≥ 2.0 过热",
+         "pass": volume_oi is not None and volume_oi < VP_RATIO_HOT},
+        {"label": "价仓同向",
+         "value": "是" if same_way else "否",
+         "rule": "当日与 5 日价格同向，才允许判定趋势",
+         "pass": same_way},
+    ]
+
+    series = []
+    for i in range(max(VP_VOLUME_WINDOW, len(daily) - 10), len(daily)):
+        row = daily[i]
+        window = [x["volume"] for x in daily[i - VP_VOLUME_WINDOW:i] if x.get("volume")]
+        window_mean = mean(window) if window else 0
+        row_ratio = row["volume"] / window_mean if window_mean else None
+        row_hold = row.get("hold")
+        prev_hold = daily[i - 1].get("hold") if i else None
+        row_oi = (row_hold / prev_hold - 1) * 100 if row_hold and prev_hold else None
+        series.append([row["date"], row["volume"], row_ratio, row_hold, row_oi])
+
+    return {
+        "version": VP_SOP_VERSION,
+        "asof": last["date"],
+        "volume": {"value": last["volume"], "avg": avg_volume, "ratio": ratio, "grade": grade},
+        "oi": {"value": hold, "day": oi_day, "five": oi_5d},
+        "price": {"day": price_day, "five": price_5d},
+        "volume_oi": volume_oi,
+        "state": state,
+        "state_text": state_text,
+        "action": action,
+        "level": level,
+        "checks": checks,
+        "series": series,
+        "thresholds": {
+            "window": VP_VOLUME_WINDOW, "dry": VP_BAND_DRY, "warm": VP_BAND_WARM,
+            "heavy": VP_BAND_HEAVY, "oi_day": VP_OI_DAY, "oi_5d": VP_OI_5D, "ratio_hot": VP_RATIO_HOT,
+        },
+    }
+
 
 def factor_metrics(rows):
     mom21 = change(rows, 21)
@@ -271,6 +384,7 @@ def signal_metrics(item):
         "spread": None if signal_close is None or latest_hourly is None else latest_hourly - signal_close,
         "gain_after_cross": gain,
         "ema55": ema([row["close"] for row in daily], 55),
+        "vp": vp_analysis(daily),
     }
 
 
