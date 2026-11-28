@@ -97,7 +97,7 @@ def adx14(rows, period=14):
 FACTOR_NAMES = ["mom21", "mom63", "mom12_1", "atr_mom21", "donchian55", "oi_confirm", "direction_score"]
 
 # 量价分析 SOP：阈值固定，改规则必须同时升级版本号并更新 docs/量价分析SOP.md
-VP_SOP_VERSION = "VP-1.1"
+VP_SOP_VERSION = "VP-1.3"
 VP_VOLUME_WINDOW = 20   # 量比基准：前 20 日均量（不含当日）
 VP_BAND_DRY = 0.8       # <0.8 缩量
 VP_BAND_WARM = 1.2      # 0.8–1.2 常量，1.2–1.8 温和放量
@@ -117,6 +117,16 @@ def volume_grade(ratio):
     if ratio < VP_BAND_HEAVY:
         return "温和放量"
     return "巨量"
+
+
+def vp_summary(asof, grade, ratio, oi_day, oi_5d, price_5d, state_text, action):
+    """一句话总结：固定模板，避免每次手写口径漂移（SOP VP-1.2 第六节）。"""
+    def num(v, unit="%"):
+        return "—" if v is None else f"{v:+.2f}{unit}"
+    md = f"{asof[5:7]}-{asof[8:10]}" if len(asof) >= 10 else asof
+    r = "—" if ratio is None else f"{ratio:.2f}"
+    return (f"{md} 量比 {r}（{grade}），持仓当日 {num(oi_day)}、5 日 {num(oi_5d)}，"
+            f"5 日价格 {num(price_5d)} → {state_text}：{action}。")
 
 
 def vp_analysis(daily):
@@ -147,8 +157,11 @@ def vp_analysis(daily):
 
     if ratio is not None and ratio < VP_BAND_DRY:
         state, state_text, action, level = "C", "缩量观望", "不做，等量能恢复", "flat"
-    elif ratio is not None and ratio >= VP_BAND_HEAVY and oi_day is not None and oi_day <= -VP_OI_DAY:
-        state, state_text, action, level = "B", "换手 / 平仓", "不追，等回踩确认", "warn"
+    elif ratio is not None and ratio >= VP_BAND_HEAVY:
+        if oi_day is not None and oi_day <= -VP_OI_DAY:
+            state, state_text, action, level = "B", "换手 / 平仓", "不追，等回踩确认", "warn"
+        else:
+            state, state_text, action, level = "B", "巨量禁追", "不追，等缩量回踩再评估", "warn"
     elif oi_5d is not None and oi_5d <= -VP_OI_5D and price_5d > 0 and (oi_day is None or oi_day < VP_OI_DAY):
         state, state_text, action, level = "D", "价涨仓减（背离）", "减仓，警惕获利了结", "warn"
     elif ratio is not None and ratio >= VP_BAND_WARM and oi_day is not None and oi_day >= VP_OI_DAY and same_way:
@@ -190,9 +203,12 @@ def vp_analysis(daily):
         row_oi = (row_hold / prev_hold - 1) * 100 if row_hold and prev_hold else None
         series.append([row["date"], row["volume"], row_ratio, row_hold, row_oi])
 
+    summary = vp_summary(last["date"], grade, ratio, oi_day, oi_5d, price_5d, state_text, action)
+
     return {
         "version": VP_SOP_VERSION,
         "asof": last["date"],
+        "summary": summary,
         "volume": {"value": last["volume"], "avg": avg_volume, "ratio": ratio, "grade": grade},
         "oi": {"value": hold, "day": oi_day, "five": oi_5d},
         "price": {"day": price_day, "five": price_5d},
